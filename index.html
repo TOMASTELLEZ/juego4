@@ -1,0 +1,1905 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Misión Rover 3D: Artefacto Marciano</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --mars-dark: #160906;
+            --mars-rust: #8c3419;
+            --mars-orange: #d95b26;
+            --neon-cyan: #00f3ff;
+            --neon-amber: #ff9e00;
+            --neon-green: #10b981;
+            --panel-bg: rgba(18, 12, 16, 0.84);
+            --panel-border: rgba(255, 158, 0, 0.38);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--mars-dark);
+            color: #f8fafc;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        #app-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* Contenedor Three.js 3D (Fase 1) */
+        #mars3d-container {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+
+        /* HUD Superior */
+        #hud-top {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .hud-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 14px;
+            padding: 10px 16px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(255, 158, 0, 0.1);
+            pointer-events: auto;
+        }
+
+        .hud-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .hud-title-small {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #cbd5e1;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .hud-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--neon-amber);
+            text-shadow: 0 0 8px rgba(255, 158, 0, 0.5);
+        }
+
+        #pieces-slots {
+            display: flex;
+            gap: 8px;
+            margin-top: 2px;
+        }
+
+        .piece-slot {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px dashed rgba(0, 243, 255, 0.4);
+            background: rgba(0, 243, 255, 0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.3);
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .piece-slot.collected {
+            border: 1px solid var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.22);
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(0, 243, 255, 0.6);
+            transform: scale(1.08);
+        }
+
+        .energy-bar-bg {
+            width: 120px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            margin-top: 4px;
+        }
+
+        #energy-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #0284c7, var(--neon-cyan));
+            box-shadow: 0 0 10px var(--neon-cyan);
+            transition: width 0.1s linear;
+        }
+
+        #mute-btn, #cam-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            height: 42px;
+            padding: 0 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.78rem;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        #mute-btn:hover, #cam-btn:hover {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        /* Radar Topográfico */
+        #radar-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        #radarCanvas {
+            width: 145px;
+            height: 145px;
+            border-radius: 50%;
+            border: 2px solid var(--neon-cyan);
+            background: rgba(8, 20, 28, 0.85);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 18px rgba(0, 243, 255, 0.2);
+        }
+
+        .radar-label {
+            margin-top: 6px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            letter-spacing: 1.5px;
+            color: var(--neon-cyan);
+            background: rgba(8, 20, 28, 0.85);
+            padding: 2px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 243, 255, 0.3);
+        }
+
+        /* Controles Táctiles */
+        #touch-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 12;
+            display: flex;
+            align-items: flex-end;
+            gap: 16px;
+            pointer-events: none;
+        }
+
+        #joystick-zone {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid rgba(255, 158, 0, 0.45);
+            position: relative;
+            pointer-events: auto;
+            touch-action: none;
+            backdrop-filter: blur(4px);
+        }
+
+        #joystick-knob {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--neon-amber) 0%, #b45309 100%);
+            border: 2px solid #fff;
+            box-shadow: 0 0 15px rgba(255, 158, 0, 0.7);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        #turbo-touch-btn {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 243, 255, 0.45) 0%, rgba(2, 132, 199, 0.25) 100%);
+            border: 2px solid var(--neon-cyan);
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+            pointer-events: auto;
+            touch-action: manipulation;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #turbo-touch-btn:active, #turbo-touch-btn.active {
+            background: rgba(0, 243, 255, 0.75);
+            transform: scale(0.92);
+        }
+
+        /* Modales */
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(12, 6, 5, 0.84);
+            backdrop-filter: blur(10px);
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .modal-card {
+            background: linear-gradient(145deg, rgba(28, 16, 14, 0.95), rgba(14, 18, 26, 0.95));
+            border: 1px solid rgba(255, 158, 0, 0.5);
+            border-radius: 20px;
+            padding: clamp(16px, 3.5vw, 28px);
+            max-width: 780px;
+            width: 100%;
+            box-shadow: 0 0 40px rgba(217, 91, 38, 0.35), inset 0 0 20px rgba(0, 243, 255, 0.08);
+        }
+
+        .mission-badge {
+            display: inline-block;
+            background: rgba(0, 243, 255, 0.15);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        h1.main-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1.8rem, 4.5vw, 3rem);
+            font-weight: 900;
+            background: linear-gradient(90deg, #ff9e00, #ffffff, #00f3ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .desc-text {
+            color: #cbd5e1;
+            font-size: 1.1rem;
+            line-height: 1.5;
+            max-width: 600px;
+            margin: 0 auto 24px auto;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-bottom: 26px;
+        }
+
+        .ctrl-item {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .ctrl-key {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-amber);
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .btn-primary {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #090d16;
+            background: linear-gradient(135deg, #ff9e00 0%, #ff5500 100%);
+            border: none;
+            padding: 15px 38px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(255, 158, 0, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 0 35px rgba(255, 158, 0, 0.8);
+        }
+
+        /* Fase 2: Rompecabezas */
+        #puzzle-modal .modal-card {
+            max-width: 860px;
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 45px rgba(0, 243, 255, 0.25);
+        }
+
+        #puzzle-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 760px;
+            margin: 10px auto 15px auto;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 2px solid rgba(0, 243, 255, 0.45);
+            background: #0a0f18;
+        }
+
+        #puzzleCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 76 / 43;
+            touch-action: none;
+            cursor: grab;
+        }
+
+        #puzzleCanvas:active {
+            cursor: grabbing;
+        }
+
+        .puzzle-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .puzzle-hint {
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+
+        .puzzle-title {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-cyan);
+            font-size: 1.6rem;
+            margin-bottom: 6px;
+        }
+
+        .puzzle-description {
+            color: #cbd5e1;
+            font-size: 1rem;
+        }
+
+        #toast-msg {
+            position: absolute;
+            top: 85px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(8, 24, 36, 0.92);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            padding: 8px 22px;
+            border-radius: 30px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+            z-index: 20;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        #toast-msg.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @media (max-width: 640px) {
+            #hud-top {
+                padding: 8px;
+                gap: 6px;
+            }
+            .hud-group { gap: 6px; }
+            .hud-panel { padding: 7px 8px; border-radius: 10px; }
+            .hud-title-small { font-size: 0.62rem; letter-spacing: 0.8px; }
+            .hud-value { font-size: 0.95rem; }
+            .piece-slot { width: 26px; height: 26px; font-size: 0.7rem; }
+            #mute-btn, #cam-btn { height: 36px; padding: 0 8px; font-size: 0.65rem; }
+            #radar-container { right: 10px; bottom: 10px; }
+            #radarCanvas { width: 96px; height: 96px; }
+            .radar-label { font-size: 0.56rem; letter-spacing: 0.8px; }
+            #touch-controls { left: 10px; bottom: 10px; gap: 10px; }
+            #joystick-zone { width: 90px; height: 90px; }
+            #joystick-knob { width: 40px; height: 40px; }
+            #turbo-touch-btn { width: 58px; height: 58px; font-size: 0.65rem; }
+            .modal-overlay { padding: 10px; }
+            .modal-card { border-radius: 15px; }
+            .mission-badge { font-size: 0.62rem; letter-spacing: 1px; }
+            .desc-text { font-size: 0.98rem; margin-bottom: 16px; }
+            .controls-grid { grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
+            .ctrl-item { padding: 9px; }
+            .btn-primary { font-size: 0.92rem; padding: 12px 22px; }
+            #puzzle-modal .modal-card { max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-y: auto; }
+            #puzzle-wrapper { margin: 8px auto; }
+            .puzzle-footer { justify-content: center; }
+            .puzzle-hint { font-size: 0.82rem; }
+        }
+
+        @media (max-width: 640px) and (orientation: landscape) {
+            #hud-top { padding: 5px 8px; }
+            #radar-container { right: 8px; bottom: 6px; }
+            #radarCanvas { width: 78px; height: 78px; }
+            #touch-controls { left: 8px; bottom: 6px; }
+            #joystick-zone { width: 76px; height: 76px; }
+            #joystick-knob { width: 34px; height: 34px; }
+            #turbo-touch-btn { width: 50px; height: 50px; }
+            .modal-overlay { padding: 6px; }
+            #start-modal .modal-card {
+                max-width: 680px;
+                padding: 12px 18px;
+            }
+            #start-modal .mission-badge { margin-bottom: 5px; }
+            #start-modal .desc-text { margin-bottom: 8px; }
+            #start-modal .controls-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 6px;
+                margin-bottom: 8px;
+            }
+            #start-modal .ctrl-item { padding: 6px; font-size: 0.85rem; }
+            #start-modal .btn-primary { padding: 9px 20px; }
+        }
+
+        @media (max-width: 900px) and (orientation: landscape) {
+            #puzzle-modal { padding: 8px; }
+            #puzzle-modal .modal-card {
+                display: grid;
+                grid-template-columns: minmax(150px, 0.75fr) minmax(0, 2fr);
+                grid-template-areas: "heading board" "footer board";
+                align-items: center;
+                gap: 8px 16px;
+                max-width: 1100px;
+                max-height: calc(100dvh - 16px);
+                overflow: hidden;
+                padding: clamp(10px, 2vh, 18px);
+            }
+            .puzzle-heading { grid-area: heading; }
+            .puzzle-title { font-size: clamp(1rem, 3.2vh, 1.4rem); }
+            .puzzle-description { font-size: 0.88rem; line-height: 1.3; }
+            #puzzle-wrapper {
+                grid-area: board;
+                width: min(100%, calc((100dvh - 36px) * 760 / 430));
+                max-width: none;
+                margin: 0 auto;
+            }
+            .puzzle-footer {
+                grid-area: footer;
+                flex-direction: column;
+                align-items: stretch;
+                justify-content: center;
+                margin-top: 0;
+            }
+            #puzzle-status { text-align: center; }
+            #btn-replay, #btn-download {
+                padding: 10px 12px !important;
+                font-size: 0.75rem !important;
+            }
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+<div id="app-wrapper">
+    <!-- Escena 3D de Marte -->
+    <div id="mars3d-container"></div>
+
+    <!-- Notificación dinámica -->
+    <div id="toast-msg">¡Módulo Marciano Recolectado!</div>
+
+    <!-- HUD Superior -->
+    <div id="hud-top">
+        <div class="hud-group">
+            <div class="hud-panel">
+                <div class="hud-title-small">Módulos Recolectados</div>
+                <div id="pieces-slots">
+                    <div class="piece-slot" id="slot-0">01</div>
+                    <div class="piece-slot" id="slot-1">02</div>
+                    <div class="piece-slot" id="slot-2">03</div>
+                    <div class="piece-slot" id="slot-3">04</div>
+                    <div class="piece-slot" id="slot-4">05</div>
+                </div>
+            </div>
+
+            <div class="hud-panel">
+                <div class="hud-title-small">Energía Turbo</div>
+                <div class="energy-bar-bg">
+                    <div id="energy-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hud-group">
+            <div class="hud-panel">
+                <div class="hud-title-small">Tiempo Misión</div>
+                <div id="timer-display" class="hud-value">00:00</div>
+            </div>
+            <button id="cam-btn" title="Cambiar vista de cámara 3D">🎥 VISTA</button>
+            <button id="mute-btn" title="Activar/Silenciar Audio">🔊</button>
+        </div>
+    </div>
+
+    <!-- Minimapa / Radar -->
+    <div id="radar-container">
+        <canvas id="radarCanvas" width="150" height="150"></canvas>
+        <div class="radar-label">RADAR TOPOGRÁFICO</div>
+    </div>
+
+    <!-- Controles Táctiles -->
+    <div id="touch-controls">
+        <div id="joystick-zone">
+            <div id="joystick-knob"></div>
+        </div>
+        <button id="turbo-touch-btn">TURBO</button>
+    </div>
+
+    <!-- Modal Inicial -->
+    <div id="start-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="mission-badge">Sector Jezero 3D • Expedición Marte</div>
+            <h1 class="main-title">Misión Rover 3D: Artefacto Marciano</h1>
+            <p class="desc-text">
+                Explora la superficie marciana en <strong>3D</strong> al mando de un rover estilo Perseverance. 
+                Sigue el radar y la flecha holográfica para recuperar los <strong>5 módulos de datos</strong> y ensamblar el artefacto final.
+            </p>
+
+            <div class="controls-grid">
+                <div class="ctrl-item">
+                    <div class="ctrl-key">WASD / FLECHAS</div>
+                    <div>Conducir y girar el rover 3D</div>
+                </div>
+                <div class="ctrl-item">
+                    <div class="ctrl-key">ESPACIO / TURBO</div>
+                    <div>Propulsión rápida (recarga con cristales)</div>
+                </div>
+                <div class="ctrl-item">
+                    <div class="ctrl-key">TECLA C / BOTÓN VISTA</div>
+                    <div>Alternar cámara trasera / orbital</div>
+                </div>
+            </div>
+
+            <button id="btn-start-mission" class="btn-primary">Desplegar Rover 3D</button>
+        </div>
+    </div>
+
+    <!-- Modal Fase 2: Rompecabezas -->
+    <div id="puzzle-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="puzzle-heading">
+                <div class="mission-badge" id="puzzle-badge">Fase 2 • Ensamblaje del Artefacto</div>
+                <h2 class="puzzle-title">Reconstrucción del Núcleo Marciano</h2>
+                <p class="puzzle-description">
+                    Arrastra cada una de las <strong>5 piezas tecnológicas</strong> hacia su silueta correspondiente en el panel central.
+                </p>
+            </div>
+
+            <div id="puzzle-wrapper">
+                <canvas id="puzzleCanvas" width="760" height="430"></canvas>
+            </div>
+
+            <div class="puzzle-footer">
+                <span class="puzzle-hint" id="puzzle-status">Piezas acopladas: 0 / 5</span>
+                <button id="btn-replay" class="btn-primary hidden" style="padding: 12px 28px; font-size: 0.95rem;">
+                    Nueva Expedición
+                </button>
+                <button id="btn-download" class="btn-primary hidden" style="padding: 12px 28px; font-size: 0.95rem;">
+                    Descargar artefacto
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ============================================================================
+// 1. REFERENCIAS AL DOM Y ACTIVOS WEB
+// ============================================================================
+const container3D = document.getElementById('mars3d-container');
+const radarCanvas = document.getElementById('radarCanvas');
+const radarCtx = radarCanvas.getContext('2d');
+const puzzleCanvas = document.getElementById('puzzleCanvas');
+const pCtx = puzzleCanvas.getContext('2d');
+
+const startModal = document.getElementById('start-modal');
+const puzzleModal = document.getElementById('puzzle-modal');
+const btnStartMission = document.getElementById('btn-start-mission');
+const btnReplay = document.getElementById('btn-replay');
+const btnDownload = document.getElementById('btn-download');
+const timerDisplay = document.getElementById('timer-display');
+const energyFill = document.getElementById('energy-fill');
+const toastMsg = document.getElementById('toast-msg');
+const muteBtn = document.getElementById('mute-btn');
+const camBtn = document.getElementById('cam-btn');
+const puzzleStatus = document.getElementById('puzzle-status');
+const puzzleBadge = document.getElementById('puzzle-badge');
+
+const webAssets = {
+    puzzleTarget: {
+        img: new Image(),
+        loaded: false,
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Perseverance-Selfie-at-Rochette-800x450.jpg/800px-Perseverance-Selfie-at-Rochette-800x450.jpg'
+    }
+};
+webAssets.puzzleTarget.img.crossOrigin = 'Anonymous';
+webAssets.puzzleTarget.img.onload = () => { webAssets.puzzleTarget.loaded = true; };
+webAssets.puzzleTarget.img.src = webAssets.puzzleTarget.url;
+
+// ============================================================================
+// 2. SINTETIZADOR DE AUDIO (WEB AUDIO API)
+// ============================================================================
+const SoundEngine = {
+    ctx: null,
+    muted: false,
+    sonarTimer: 0,
+
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    },
+
+    toggleMute() {
+        this.muted = !this.muted;
+        muteBtn.textContent = this.muted ? '🔇' : '🔊';
+    },
+
+    playTone(freq, type, duration, vol = 0.15, slideTo = null) {
+        if (this.muted || !this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        if (slideTo) {
+            osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+        }
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+
+    playSonar(proximityRatio) {
+        const freq = 520 + proximityRatio * 420;
+        this.playTone(freq, 'sine', 0.12, 0.06);
+    },
+
+    playCollect() {
+        this.playTone(523.25, 'triangle', 0.15, 0.18);
+        setTimeout(() => this.playTone(659.25, 'triangle', 0.15, 0.18), 90);
+        setTimeout(() => this.playTone(1046.5, 'sine', 0.3, 0.2), 180);
+    },
+
+    playCrystal() {
+        this.playTone(880, 'sine', 0.2, 0.14, 1320);
+    },
+
+    playBump() {
+        this.playTone(110, 'sawtooth', 0.18, 0.16, 45);
+    },
+
+    playSnap() {
+        this.playTone(440, 'triangle', 0.12, 0.2, 880);
+    },
+
+    playVictory() {
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((n, idx) => {
+            setTimeout(() => this.playTone(n, 'triangle', 0.35, 0.2), idx * 120);
+        });
+    }
+};
+
+muteBtn.addEventListener('click', () => SoundEngine.toggleMute());
+
+// ============================================================================
+// 3. ESCENA THREE.JS, LUCES, TERRENO MARCIANO Y ROVER 3D DETALLADO
+// ============================================================================
+const WORLD_SIZE = 280; // Unidades 3D (-140 a +140)
+const HALF_WORLD = WORLD_SIZE / 2;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a1008);
+scene.fog = new THREE.FogExp2(0x3a150a, 0.011);
+
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 450);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+container3D.appendChild(renderer.domElement);
+
+// Iluminación Marciana (Sol tenue + luz atmosférica cálida + luz de relleno cian)
+const hemiLight = new THREE.HemisphereLight(0xffb482, 0x3b1409, 1.3);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xffdfb8, 2.8);
+sunLight.position.set(80, 110, 60);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 10;
+sunLight.shadow.camera.far = 280;
+const dShadow = 110;
+sunLight.shadow.camera.left = -dShadow;
+sunLight.shadow.camera.right = dShadow;
+sunLight.shadow.camera.top = dShadow;
+sunLight.shadow.camera.bottom = -dShadow;
+scene.add(sunLight);
+
+// Generar textura procedural de suelo marciano para el terreno 3D
+function createMarsGroundTexture() {
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 512;
+    const g = c.getContext('2d');
+
+    g.fillStyle = '#9c3d1e';
+    g.fillRect(0, 0, 512, 512);
+
+    // Granulado de arena y rocas
+    for (let i = 0; i < 6500; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const r = Math.random() * 2.5;
+        g.fillStyle = Math.random() > 0.5 ? 'rgba(65, 22, 10, 0.25)' : 'rgba(225, 118, 65, 0.22)';
+        g.fillRect(x, y, r, r);
+    }
+
+    // Líneas topográficas sutiles
+    g.strokeStyle = 'rgba(255, 190, 140, 0.08)';
+    g.lineWidth = 2;
+    g.strokeRect(0, 0, 512, 512);
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(24, 24);
+    return tex;
+}
+
+const groundMat = new THREE.MeshStandardMaterial({
+    map: createMarsGroundTexture(),
+    roughness: 0.92,
+    metalness: 0.05
+});
+const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE + 80, WORLD_SIZE + 80), groundMat);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+// Muro perimetral holográfico de zona de exploración
+const borderGeo = new THREE.RingGeometry(HALF_WORLD - 2, HALF_WORLD - 1.4, 64);
+const borderMat = new THREE.MeshBasicMaterial({ color: 0xff9e00, side: THREE.DoubleSide, transparent: true, opacity: 0.45 });
+const borderRing = new THREE.Mesh(borderGeo, borderMat);
+borderRing.rotation.x = -Math.PI / 2;
+borderRing.position.y = 0.08;
+scene.add(borderRing);
+
+// ============================================================================
+// CONSTRUCCIÓN DEL ROVER 3D ESTILO NASA PERSEVERANCE (6 RUEDAS, MÁSTIL, RTG, FAROS)
+// ============================================================================
+function buildMarsRover3D() {
+    const root = new THREE.Group();
+
+    const bodyWhite = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.55, roughness: 0.3 });
+    const goldFoil = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.88, roughness: 0.2 });
+    const darkFrame = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.4 });
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.85, metalness: 0.2 });
+    const cyanGlow = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+
+    // 1. Chasis principal
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.65, 2.5), bodyWhite);
+    chassis.position.y = 0.85;
+    chassis.castShadow = true;
+    chassis.receiveShadow = true;
+    root.add(chassis);
+
+    // Cubierta térmica dorada superior
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.12, 2.1), goldFoil);
+    deck.position.set(0, 1.2, -0.1);
+    deck.castShadow = true;
+    root.add(deck);
+
+    // 2. Generador nuclear RTG trasero inclinado
+    const rtg = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 1.1, 16), bodyWhite);
+    rtg.position.set(0, 1.25, 1.35);
+    rtg.rotation.x = -0.55;
+    rtg.castShadow = true;
+    root.add(rtg);
+
+    const rtgFins = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.08, 0.9), darkFrame);
+    rtgFins.position.set(0, 1.25, 1.35);
+    rtgFins.rotation.x = -0.55;
+    root.add(rtgFins);
+
+    // 3. Mástil de cámara frontal (SuperCam)
+    const mastPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.1, 12), bodyWhite);
+    mastPole.position.set(0.45, 1.65, -0.85);
+    mastPole.castShadow = true;
+    root.add(mastPole);
+
+    const camHead = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.32, 0.38), bodyWhite);
+    camHead.position.set(0.45, 2.25, -0.85);
+    camHead.castShadow = true;
+    root.add(camHead);
+
+    // Lente láser cian de SuperCam
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 16), cyanGlow);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(0.45, 2.25, -1.05);
+    root.add(lens);
+
+    // 4. Antena parabólica giratoria
+    const dishGroup = new THREE.Group();
+    dishGroup.position.set(-0.5, 1.45, 0.45);
+    const dish = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.18, 20, 1, true), goldFoil);
+    dish.rotation.x = -Math.PI / 3;
+    dishGroup.add(dish);
+    root.add(dishGroup);
+
+    // 5. Brazo robótico delantero articulado
+    const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.9), darkFrame);
+    arm1.position.set(-0.4, 0.85, -1.55);
+    arm1.rotation.y = 0.25;
+    root.add(arm1);
+
+    const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.25, 12), goldFoil);
+    turret.position.set(-0.5, 0.85, -2.0);
+    root.add(turret);
+
+    // 6. Sistema de suspensión Rocker-Bogie y 6 Ruedas
+    const wheels = [];
+    const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.34, 20);
+    wheelGeo.rotateZ(Math.PI / 2);
+
+    const zPositions = [-1.15, 0, 1.15];
+    const xSides = [-1.12, 1.12];
+
+    xSides.forEach((xPos) => {
+        // Barra longitudinal de suspensión
+        const bogieBar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.3), darkFrame);
+        bogieBar.position.set(xPos * 0.82, 0.58, 0);
+        root.add(bogieBar);
+
+        zPositions.forEach((zPos) => {
+            const wheelPivot = new THREE.Group();
+            wheelPivot.position.set(xPos, 0.42, zPos);
+
+            const tire = new THREE.Mesh(wheelGeo, tireMat);
+            tire.castShadow = true;
+            wheelPivot.add(tire);
+
+            // Rin metálico con detalle cian
+            const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.36, 12), goldFoil);
+            hub.rotation.z = Math.PI / 2;
+            wheelPivot.add(hub);
+
+            // Puntal hacia el chasis
+            const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.55, 8), darkFrame);
+            strut.position.set(-xPos * 0.2, 0.22, 0);
+            strut.rotation.z = xPos > 0 ? 0.55 : -0.55;
+            wheelPivot.add(strut);
+
+            root.add(wheelPivot);
+            wheels.push({ pivot: wheelPivot, tire });
+        });
+    });
+
+    // 7. Faros frontales reales (SpotLight + conos de luz)
+    const headLight = new THREE.SpotLight(0xfff4d6, 18, 42, Math.PI / 4.5, 0.5, 1);
+    headLight.position.set(0, 1.2, -1.2);
+    headLight.target.position.set(0, 0, -14);
+    root.add(headLight);
+    root.add(headLight.target);
+
+    // 8. Propulsor Turbo trasero
+    const turboFlame = new THREE.Mesh(
+        new THREE.ConeGeometry(0.32, 1.5, 14),
+        new THREE.MeshBasicMaterial({ color: 0x00f3ff, transparent: true, opacity: 0.85 })
+    );
+    turboFlame.rotation.x = Math.PI / 2;
+    turboFlame.position.set(0, 0.85, 2.1);
+    turboFlame.visible = false;
+    root.add(turboFlame);
+
+    // 9. Flecha Brújula Holográfica 3D flotando sobre el rover
+    const compassGroup = new THREE.Group();
+    compassGroup.position.set(0, 3.05, 0);
+    const arrowCone = new THREE.Mesh(
+        new THREE.ConeGeometry(0.26, 0.7, 12),
+        new THREE.MeshBasicMaterial({ color: 0x00f3ff })
+    );
+    arrowCone.rotation.x = -Math.PI / 2;
+    compassGroup.add(arrowCone);
+    root.add(compassGroup);
+
+    return { root, wheels, dishGroup, turboFlame, compassGroup };
+}
+
+const rover3D = buildMarsRover3D();
+scene.add(rover3D.root);
+
+// ============================================================================
+// 4. ESTADO DEL JUEGO Y GENERACIÓN DEL MUNDO MARCIANO 3D
+// ============================================================================
+let gamePhase = 'MENU'; // 'MENU', 'EXPLORE', 'PUZZLE', 'VICTORY'
+let cameraMode = 0; // 0: Tercera persona dinámica, 1: Vista táctica elevada
+let missionTime = 0;
+let lastFrameTime = 0;
+let collectedCount = 0;
+let toastTimeout = null;
+let cameraShake = 0;
+
+const roverState = {
+    x: 0,
+    z: 0,
+    angle: 0, // 0 apunta hacia -Z (adelante)
+    speed: 0,
+    maxSpeed: 24,
+    turboMaxSpeed: 42,
+    accel: 46,
+    friction: 0.93,
+    turnSpeed: 2.5,
+    radius: 1.8,
+    energy: 100,
+    isTurbo: false
+};
+
+let worldObjects = []; // Para limpiar al reiniciar
+let rocks = [];
+let artifacts = [];
+let crystals = [];
+let dustParticles = [];
+
+const keys = {
+    ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
+    KeyW: false, KeyS: false, KeyA: false, KeyD: false, Space: false
+};
+const joystick = { active: false, dx: 0, dy: 0 };
+
+function clearWorldObjects() {
+    worldObjects.forEach((obj) => scene.remove(obj));
+    worldObjects = [];
+    rocks = [];
+    artifacts = [];
+    crystals = [];
+    dustParticles.forEach((p) => scene.remove(p.mesh));
+    dustParticles = [];
+}
+
+function initMarsWorld3D() {
+    clearWorldObjects();
+    missionTime = 0;
+    collectedCount = 0;
+
+    for (let i = 0; i < 5; i++) {
+        document.getElementById(`slot-${i}`).classList.remove('collected');
+    }
+
+    roverState.x = 0;
+    roverState.z = 0;
+    roverState.angle = 0;
+    roverState.speed = 0;
+    roverState.energy = 100;
+    rover3D.root.position.set(0, 0, 0);
+    rover3D.root.rotation.set(0, 0, 0);
+
+    // 1. Cráteres 3D en el terreno
+    const craterMat = new THREE.MeshStandardMaterial({ color: 0x5c1f0e, roughness: 0.95 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0xb84a27, roughness: 0.9 });
+
+    for (let i = 0; i < 42; i++) {
+        const cx = (Math.random() - 0.5) * (WORLD_SIZE - 30);
+        const cz = (Math.random() - 0.5) * (WORLD_SIZE - 30);
+        const rad = 3.5 + Math.random() * 9;
+
+        const craterGroup = new THREE.Group();
+        craterGroup.position.set(cx, 0.03, cz);
+
+        const pit = new THREE.Mesh(new THREE.CircleGeometry(rad, 24), craterMat);
+        pit.rotation.x = -Math.PI / 2;
+        craterGroup.add(pit);
+
+        const rim = new THREE.Mesh(new THREE.RingGeometry(rad * 0.92, rad * 1.12, 24), rimMat);
+        rim.rotation.x = -Math.PI / 2;
+        rim.position.y = 0.02;
+        craterGroup.add(rim);
+
+        scene.add(craterGroup);
+        worldObjects.push(craterGroup);
+    }
+
+    // 2. Rocas marcianas 3D (Obstáculos con colisión)
+    const rockGeo = new THREE.DodecahedronGeometry(1, 1);
+    const rockMatA = new THREE.MeshStandardMaterial({ color: 0x6b2613, roughness: 0.88, flatShading: true });
+    const rockMatB = new THREE.MeshStandardMaterial({ color: 0x853119, roughness: 0.85, flatShading: true });
+
+    for (let i = 0; i < 65; i++) {
+        let rx, rz, rad;
+        do {
+            rx = (Math.random() - 0.5) * (WORLD_SIZE - 26);
+            rz = (Math.random() - 0.5) * (WORLD_SIZE - 26);
+            rad = 1.6 + Math.random() * 2.4;
+        } while (Math.hypot(rx, rz) < 16);
+
+        const rockMesh = new THREE.Mesh(rockGeo, Math.random() > 0.5 ? rockMatA : rockMatB);
+        rockMesh.position.set(rx, rad * 0.55, rz);
+        rockMesh.scale.set(rad * (0.9 + Math.random() * 0.4), rad * 0.75, rad * (0.9 + Math.random() * 0.4));
+        rockMesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+        rockMesh.castShadow = true;
+        rockMesh.receiveShadow = true;
+
+        scene.add(rockMesh);
+        worldObjects.push(rockMesh);
+        rocks.push({ x: rx, z: rz, radius: rad * 0.92 });
+    }
+
+    // 3. Las 5 Piezas Tecnológicas 3D con baliza holográfica
+    const sectorAngles = [0, 1.25, 2.5, 3.8, 5.1];
+    for (let i = 0; i < 5; i++) {
+        const ang = sectorAngles[i] + (Math.random() - 0.5) * 0.45;
+        const dist = 48 + Math.random() * 62;
+        const ax = Math.max(-HALF_WORLD + 16, Math.min(HALF_WORLD - 16, Math.cos(ang) * dist));
+        const az = Math.max(-HALF_WORLD + 16, Math.min(HALF_WORLD - 16, Math.sin(ang) * dist));
+
+        const artGroup = new THREE.Group();
+        artGroup.position.set(ax, 1.4, az);
+
+        // Octaedro tecnológico dorado/cian
+        const core = new THREE.Mesh(
+            new THREE.OctahedronGeometry(1.1, 0),
+            new THREE.MeshStandardMaterial({
+                color: 0x00f3ff,
+                emissive: 0x007799,
+                metalness: 0.85,
+                roughness: 0.15
+            })
+        );
+        core.castShadow = true;
+        artGroup.add(core);
+
+        // Anillo orbital
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(1.65, 0.08, 12, 32),
+            new THREE.MeshBasicMaterial({ color: 0xff9e00 })
+        );
+        ring.rotation.x = Math.PI / 2.4;
+        artGroup.add(ring);
+
+        // Rayo vertical de localización
+        const beam = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.18, 0.85, 28, 16, 1, true),
+            new THREE.MeshBasicMaterial({
+                color: 0x00f3ff,
+                transparent: true,
+                opacity: 0.16,
+                side: THREE.DoubleSide
+            })
+        );
+        beam.position.y = 13;
+        artGroup.add(beam);
+
+        scene.add(artGroup);
+        worldObjects.push(artGroup);
+
+        artifacts.push({
+            id: i,
+            x: ax,
+            z: az,
+            radius: 2.2,
+            collected: false,
+            group: artGroup,
+            core,
+            ring,
+            name: `Módulo #0${i + 1}`
+        });
+    }
+
+    // 4. Cristales de energía azul 3D
+    const crystalGeo = new THREE.OctahedronGeometry(0.85, 0);
+    const crystalMat = new THREE.MeshStandardMaterial({
+        color: 0x00f3ff,
+        emissive: 0x00aaff,
+        emissiveIntensity: 0.6,
+        roughness: 0.1
+    });
+
+    for (let i = 0; i < 20; i++) {
+        const cx = (Math.random() - 0.5) * (WORLD_SIZE - 30);
+        const cz = (Math.random() - 0.5) * (WORLD_SIZE - 30);
+        const cMesh = new THREE.Mesh(crystalGeo, crystalMat);
+        cMesh.position.set(cx, 1.0, cz);
+        cMesh.scale.set(0.7, 1.4, 0.7);
+        scene.add(cMesh);
+        worldObjects.push(cMesh);
+
+        crystals.push({ x: cx, z: cz, collected: false, mesh: cMesh });
+    }
+}
+
+function showToast(text) {
+    toastMsg.textContent = text;
+    toastMsg.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toastMsg.classList.remove('show'), 2400);
+}
+
+function spawnDust3D(x, z, colorHex, count) {
+    const geo = new THREE.SphereGeometry(0.24, 6, 6);
+    const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.7 });
+    for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(geo, mat.clone());
+        mesh.position.set(x + (Math.random() - 0.5) * 1.2, 0.35, z + (Math.random() - 0.5) * 1.2);
+        scene.add(mesh);
+        dustParticles.push({
+            mesh,
+            vx: (Math.random() - 0.5) * 4,
+            vy: 1.5 + Math.random() * 2.5,
+            vz: (Math.random() - 0.5) * 4,
+            life: 0.55
+        });
+    }
+}
+
+// ============================================================================
+// 5. FÍSICA 3D DEL ROVER, COLISIONES Y CÁMARA DE SEGUIMIENTO
+// ============================================================================
+function updateExplore3D(dt) {
+    missionTime += dt;
+    const mins = String(Math.floor(missionTime / 60)).padStart(2, '0');
+    const secs = String(Math.floor(missionTime % 60)).padStart(2, '0');
+    timerDisplay.textContent = `${mins}:${secs}`;
+
+    let throttle = 0;
+    let steer = 0;
+
+    if (joystick.active) {
+        const mag = Math.hypot(joystick.dx, joystick.dy);
+        if (mag > 0.15) {
+            // Joystick en pantalla relativo a la orientación del rover
+            steer = -joystick.dx * 1.15;
+            throttle = -joystick.dy;
+        }
+    } else {
+        if (keys.ArrowUp || keys.KeyW) throttle += 1;
+        if (keys.ArrowDown || keys.KeyS) throttle -= 0.75;
+        if (keys.ArrowLeft || keys.KeyA) steer += 1;
+        if (keys.ArrowRight || keys.KeyD) steer -= 1;
+    }
+
+    // Turbo
+    if (keys.Space && roverState.energy > 5 && throttle > 0) {
+        roverState.isTurbo = true;
+        roverState.energy = Math.max(0, roverState.energy - 34 * dt);
+        rover3D.turboFlame.visible = true;
+        rover3D.turboFlame.scale.set(1, 0.8 + Math.random() * 0.5, 1);
+    } else {
+        roverState.isTurbo = false;
+        roverState.energy = Math.min(100, roverState.energy + 10 * dt);
+        rover3D.turboFlame.visible = false;
+    }
+    energyFill.style.width = `${roverState.energy}%`;
+
+    const maxSpd = roverState.isTurbo ? roverState.turboMaxSpeed : roverState.maxSpeed;
+    if (throttle !== 0) {
+        roverState.speed += throttle * roverState.accel * (roverState.isTurbo ? 1.5 : 1) * dt;
+    } else {
+        roverState.speed *= Math.pow(roverState.friction, dt * 60);
+    }
+    roverState.speed = Math.max(-roverState.maxSpeed * 0.6, Math.min(maxSpd, roverState.speed));
+
+    const turnFactor = Math.abs(roverState.speed) > 1.2 ? (roverState.speed >= 0 ? 1 : -1) : 0.65;
+    roverState.angle += steer * roverState.turnSpeed * turnFactor * dt;
+
+    // Avance en el plano XZ (0 rad = hacia -Z)
+    const forwardX = -Math.sin(roverState.angle);
+    const forwardZ = -Math.cos(roverState.angle);
+
+    roverState.x += forwardX * roverState.speed * dt;
+    roverState.z += forwardZ * roverState.speed * dt;
+
+    // Límites del cráter
+    const limit = HALF_WORLD - 4;
+    if (roverState.x < -limit) { roverState.x = -limit; roverState.speed *= -0.3; }
+    if (roverState.x > limit) { roverState.x = limit; roverState.speed *= -0.3; }
+    if (roverState.z < -limit) { roverState.z = -limit; roverState.speed *= -0.3; }
+    if (roverState.z > limit) { roverState.z = limit; roverState.speed *= -0.3; }
+
+    // Colisión con rocas 3D
+    for (const rock of rocks) {
+        const dx = roverState.x - rock.x;
+        const dz = roverState.z - rock.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = roverState.radius + rock.radius;
+
+        if (dist < minDist && dist > 0) {
+            const nx = dx / dist;
+            const nz = dz / dist;
+            roverState.x = rock.x + nx * minDist;
+            roverState.z = rock.z + nz * minDist;
+
+            if (Math.abs(roverState.speed) > 6) {
+                SoundEngine.playBump();
+                cameraShake = 0.25;
+                spawnDust3D(roverState.x - nx * 1.5, roverState.z - nz * 1.5, 0xff9e00, 7);
+            }
+            roverState.speed *= -0.35;
+        }
+    }
+
+    // Actualizar transformación 3D del Rover y rotación de sus 6 ruedas
+    rover3D.root.position.set(roverState.x, 0, roverState.z);
+    rover3D.root.rotation.y = roverState.angle;
+    rover3D.root.rotation.z = -steer * 0.05; // Inclinación suave en curvas
+    rover3D.dishGroup.rotation.y += dt * 2.5;
+
+    const wheelSpin = roverState.speed * dt * 2.2;
+    rover3D.wheels.forEach((w) => {
+        w.tire.rotation.x -= wheelSpin;
+    });
+
+    if (Math.abs(roverState.speed) > 4 && Math.random() < 0.35) {
+        spawnDust3D(
+            roverState.x - forwardX * 1.6,
+            roverState.z - forwardZ * 1.6,
+            roverState.isTurbo ? 0x00f3ff : 0xc25934,
+            1
+        );
+    }
+
+    // Recolección de cristales
+    for (const c of crystals) {
+        if (c.collected) continue;
+        c.mesh.rotation.y += dt * 2.5;
+        if (Math.hypot(roverState.x - c.x, roverState.z - c.z) < roverState.radius + 1.4) {
+            c.collected = true;
+            c.mesh.visible = false;
+            roverState.energy = Math.min(100, roverState.energy + 45);
+            SoundEngine.playCrystal();
+            spawnDust3D(c.x, c.z, 0x00f3ff, 12);
+            showToast('⚡ Energía Turbo Recargada (+45%)');
+        }
+    }
+
+    // Recolección de las 5 Piezas Tecnológicas y orientación de Brújula 3D
+    let nearest = null;
+    let minDist = Infinity;
+
+    for (const art of artifacts) {
+        if (art.collected) continue;
+        art.core.rotation.y += dt * 2.0;
+        art.ring.rotation.z += dt * 1.8;
+
+        const d = Math.hypot(roverState.x - art.x, roverState.z - art.z);
+        if (d < minDist) {
+            minDist = d;
+            nearest = art;
+        }
+
+        if (d < roverState.radius + art.radius) {
+            art.collected = true;
+            art.group.visible = false;
+            document.getElementById(`slot-${collectedCount}`).classList.add('collected');
+            collectedCount++;
+            SoundEngine.playCollect();
+            spawnDust3D(art.x, art.z, 0x00f3ff, 20);
+            showToast(`🛰️ ${art.name} recuperado (${collectedCount}/5)`);
+
+            if (collectedCount >= 5) {
+                setTimeout(() => startPuzzlePhase(), 850);
+            }
+        }
+    }
+
+    // Orientar flecha holográfica 3D hacia la pieza más cercana
+    if (nearest) {
+        rover3D.compassGroup.visible = true;
+        const worldAngle = Math.atan2(-(nearest.x - roverState.x), -(nearest.z - roverState.z));
+        rover3D.compassGroup.rotation.y = worldAngle - roverState.angle;
+
+        if (minDist < 42 && collectedCount < 5) {
+            const proximity = 1 - minDist / 42;
+            SoundEngine.sonarTimer -= dt;
+            if (SoundEngine.sonarTimer <= 0) {
+                SoundEngine.playSonar(proximity);
+                SoundEngine.sonarTimer = Math.max(0.28, 1.1 - proximity * 0.8);
+            }
+        }
+    } else {
+        rover3D.compassGroup.visible = false;
+    }
+
+    // Actualizar partículas de polvo 3D
+    for (let i = dustParticles.length - 1; i >= 0; i--) {
+        const p = dustParticles[i];
+        p.mesh.position.x += p.vx * dt;
+        p.mesh.position.y += p.vy * dt;
+        p.mesh.position.z += p.vz * dt;
+        p.life -= dt;
+        p.mesh.material.opacity = Math.max(0, p.life * 1.2);
+        if (p.life <= 0) {
+            scene.remove(p.mesh);
+            dustParticles.splice(i, 1);
+        }
+    }
+
+    // Cámara 3D suave detrás del rover
+    updateCamera3D(dt, forwardX, forwardZ);
+}
+
+function updateCamera3D(dt, forwardX, forwardZ) {
+    let targetPos;
+    if (cameraMode === 0) {
+        // Vista tercera persona cinematográfica detrás del rover
+        const distBack = 11.5;
+        const height = 6.2;
+        targetPos = new THREE.Vector3(
+            roverState.x - forwardX * distBack,
+            height,
+            roverState.z - forwardZ * distBack
+        );
+    } else {
+        // Vista táctica elevada
+        targetPos = new THREE.Vector3(
+            roverState.x - forwardX * 16,
+            19,
+            roverState.z - forwardZ * 16
+        );
+    }
+
+    if (cameraShake > 0) {
+        cameraShake -= dt;
+        targetPos.x += (Math.random() - 0.5) * 0.8;
+        targetPos.y += (Math.random() - 0.5) * 0.8;
+    }
+
+    camera.position.lerp(targetPos, 6 * dt);
+    const lookTarget = new THREE.Vector3(
+        roverState.x + forwardX * 5,
+        1.2,
+        roverState.z + forwardZ * 5
+    );
+    camera.lookAt(lookTarget);
+}
+
+// ============================================================================
+// 6. RADAR TOPOGRÁFICO HUD
+// ============================================================================
+function renderRadar() {
+    const w = radarCanvas.width;
+    const h = radarCanvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const rMax = w / 2 - 6;
+
+    radarCtx.clearRect(0, 0, w, h);
+
+    radarCtx.strokeStyle = 'rgba(0, 243, 255, 0.22)';
+    radarCtx.lineWidth = 1;
+    [0.33, 0.66, 1].forEach((ratio) => {
+        radarCtx.beginPath();
+        radarCtx.arc(cx, cy, rMax * ratio, 0, Math.PI * 2);
+        radarCtx.stroke();
+    });
+
+    // Barrido de sonar
+    radarCtx.save();
+    radarCtx.translate(cx, cy);
+    radarCtx.rotate(-rover3D.dishGroup.rotation.y);
+    const sweepGrad = radarCtx.createLinearGradient(0, 0, rMax, 0);
+    sweepGrad.addColorStop(0, 'rgba(0, 243, 255, 0.35)');
+    sweepGrad.addColorStop(1, 'rgba(0, 243, 255, 0)');
+    radarCtx.fillStyle = sweepGrad;
+    radarCtx.beginPath();
+    radarCtx.moveTo(0, 0);
+    radarCtx.arc(0, 0, rMax, -0.35, 0.35);
+    radarCtx.closePath();
+    radarCtx.fill();
+    radarCtx.restore();
+
+    const scale = rMax / HALF_WORLD;
+
+    // Rocas
+    radarCtx.fillStyle = 'rgba(255, 120, 70, 0.45)';
+    for (const rock of rocks) {
+        const rx = cx + rock.x * scale;
+        const ry = cy + rock.z * scale;
+        if (Math.hypot(rx - cx, ry - cy) < rMax) {
+            radarCtx.fillRect(rx - 1.5, ry - 1.5, 3, 3);
+        }
+    }
+
+    // 5 Piezas
+    for (const art of artifacts) {
+        if (art.collected) continue;
+        const ax = cx + art.x * scale;
+        const ay = cy + art.z * scale;
+        radarCtx.fillStyle = '#00f3ff';
+        radarCtx.beginPath();
+        radarCtx.arc(ax, ay, 4, 0, Math.PI * 2);
+        radarCtx.fill();
+    }
+
+    // Rover
+    const px = cx + roverState.x * scale;
+    const py = cy + roverState.z * scale;
+    radarCtx.fillStyle = '#ff9e00';
+    radarCtx.beginPath();
+    radarCtx.arc(px, py, 3.8, 0, Math.PI * 2);
+    radarCtx.fill();
+}
+
+// ============================================================================
+// 7. FASE 2: ROMPECABEZAS DE LAS 5 PIEZAS (DRAG & DROP CON ENCAJE MAGNÉTICO)
+// ============================================================================
+let puzzlePieces = [];
+let draggingPiece = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let scanAnimationProgress = 0;
+
+const BOARD_RECT = { x: 240, y: 45, w: 480, h: 320 };
+
+const PIECE_SHAPES = [
+    { id: 0, poly: [{ x: 0, y: 0 }, { x: 0.52, y: 0 }, { x: 0.46, y: 0.52 }, { x: 0, y: 0.48 }] },
+    { id: 1, poly: [{ x: 0.52, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0.50 }, { x: 0.46, y: 0.52 }] },
+    { id: 2, poly: [{ x: 0, y: 0.48 }, { x: 0.36, y: 0.50 }, { x: 0.32, y: 1 }, { x: 0, y: 1 }] },
+    { id: 3, poly: [{ x: 0.36, y: 0.50 }, { x: 0.68, y: 0.51 }, { x: 0.72, y: 1 }, { x: 0.32, y: 1 }] },
+    { id: 4, poly: [{ x: 0.68, y: 0.51 }, { x: 1, y: 0.50 }, { x: 1, y: 1 }, { x: 0.72, y: 1 }] }
+];
+
+function startPuzzlePhase() {
+    gamePhase = 'PUZZLE';
+    puzzleModal.classList.remove('hidden');
+    btnReplay.classList.add('hidden');
+    btnDownload.classList.add('hidden');
+    puzzleBadge.textContent = 'Fase 2 • Ensamblaje del Artefacto';
+    puzzleStatus.textContent = 'Piezas acopladas: 0 / 5';
+    scanAnimationProgress = 0;
+
+    const trayPositions = [
+        { x: 35, y: 30 },
+        { x: 115, y: 105 },
+        { x: 30, y: 185 },
+        { x: 110, y: 265 },
+        { x: 40, y: 335 }
+    ];
+
+    puzzlePieces = PIECE_SHAPES.map((shape, idx) => {
+        const cxNorm = shape.poly.reduce((s, p) => s + p.x, 0) / shape.poly.length;
+        const cyNorm = shape.poly.reduce((s, p) => s + p.y, 0) / shape.poly.length;
+        const tray = trayPositions[idx];
+
+        return {
+            id: shape.id,
+            poly: shape.poly,
+            targetX: BOARD_RECT.x,
+            targetY: BOARD_RECT.y,
+            x: tray.x - cxNorm * BOARD_RECT.w + 65,
+            y: tray.y - cyNorm * BOARD_RECT.h + 30,
+            snapped: false
+        };
+    });
+
+    renderPuzzle();
+}
+
+function drawPiecePath(ctxTarget, piece, offsetX, offsetY) {
+    ctxTarget.beginPath();
+    piece.poly.forEach((pt, idx) => {
+        const px = offsetX + pt.x * BOARD_RECT.w;
+        const py = offsetY + pt.y * BOARD_RECT.h;
+        if (idx === 0) ctxTarget.moveTo(px, py);
+        else ctxTarget.lineTo(px, py);
+    });
+    ctxTarget.closePath();
+}
+
+function drawArtifactArtwork(ctxTarget, rx, ry, rw, rh) {
+    if (webAssets.puzzleTarget.loaded) {
+        ctxTarget.drawImage(webAssets.puzzleTarget.img, rx, ry, rw, rh);
+    } else {
+        const skyGrad = ctxTarget.createLinearGradient(rx, ry, rx, ry + rh);
+        skyGrad.addColorStop(0, '#1e1b4b');
+        skyGrad.addColorStop(0.55, '#9a3412');
+        skyGrad.addColorStop(1, '#451a03');
+        ctxTarget.fillStyle = skyGrad;
+        ctxTarget.fillRect(rx, ry, rw, rh);
+    }
+    ctxTarget.strokeStyle = 'rgba(0, 243, 255, 0.35)';
+    ctxTarget.lineWidth = 1;
+    ctxTarget.strokeRect(rx + 8, ry + 8, rw - 16, rh - 16);
+}
+
+function renderPuzzle() {
+    pCtx.clearRect(0, 0, puzzleCanvas.width, puzzleCanvas.height);
+
+    pCtx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    pCtx.fillRect(12, 15, 205, 400);
+    pCtx.strokeStyle = 'rgba(255, 158, 0, 0.3)';
+    pCtx.strokeRect(12, 15, 205, 400);
+
+    pCtx.fillStyle = '#ff9e00';
+    pCtx.font = '700 12px Orbitron, sans-serif';
+    pCtx.fillText('PIEZAS RECOLECTADAS', 26, 36);
+
+    pCtx.save();
+    pCtx.fillStyle = 'rgba(0, 243, 255, 0.04)';
+    pCtx.fillRect(BOARD_RECT.x, BOARD_RECT.y, BOARD_RECT.w, BOARD_RECT.h);
+    pCtx.strokeStyle = 'rgba(0, 243, 255, 0.45)';
+    pCtx.lineWidth = 2;
+    pCtx.setLineDash([8, 6]);
+    pCtx.strokeRect(BOARD_RECT.x, BOARD_RECT.y, BOARD_RECT.w, BOARD_RECT.h);
+    pCtx.setLineDash([]);
+
+    for (const piece of puzzlePieces) {
+        drawPiecePath(pCtx, piece, piece.targetX, piece.targetY);
+        pCtx.strokeStyle = 'rgba(0, 243, 255, 0.25)';
+        pCtx.lineWidth = 1.5;
+        pCtx.stroke();
+    }
+    pCtx.restore();
+
+    const sortedPieces = [...puzzlePieces].sort((a, b) => (a.snapped === b.snapped ? 0 : a.snapped ? -1 : 1));
+
+    for (const piece of sortedPieces) {
+        pCtx.save();
+        drawPiecePath(pCtx, piece, piece.x, piece.y);
+        pCtx.clip();
+        drawArtifactArtwork(pCtx, piece.x, piece.y, BOARD_RECT.w, BOARD_RECT.h);
+        pCtx.restore();
+
+        pCtx.save();
+        drawPiecePath(pCtx, piece, piece.x, piece.y);
+        if (piece.snapped) {
+            pCtx.strokeStyle = gamePhase === 'VICTORY' ? '#10b981' : 'rgba(0, 243, 255, 0.6)';
+            pCtx.lineWidth = 2;
+        } else {
+            pCtx.strokeStyle = '#ff9e00';
+            pCtx.lineWidth = 2.5;
+            pCtx.shadowColor = '#ff9e00';
+            pCtx.shadowBlur = 10;
+        }
+        pCtx.stroke();
+        pCtx.restore();
+    }
+
+    if (gamePhase === 'VICTORY') {
+        scanAnimationProgress = Math.min(1, scanAnimationProgress + 0.025);
+        const scanY = BOARD_RECT.y + BOARD_RECT.h * scanAnimationProgress;
+
+        if (scanAnimationProgress < 1) {
+            pCtx.save();
+            pCtx.strokeStyle = '#10b981';
+            pCtx.lineWidth = 4;
+            pCtx.shadowColor = '#10b981';
+            pCtx.shadowBlur = 18;
+            pCtx.beginPath();
+            pCtx.moveTo(BOARD_RECT.x, scanY);
+            pCtx.lineTo(BOARD_RECT.x + BOARD_RECT.w, scanY);
+            pCtx.stroke();
+            pCtx.restore();
+            requestAnimationFrame(renderPuzzle);
+        } else {
+            pCtx.save();
+            pCtx.fillStyle = 'rgba(6, 24, 18, 0.82)';
+            pCtx.fillRect(BOARD_RECT.x + 30, BOARD_RECT.y + BOARD_RECT.h - 68, BOARD_RECT.w - 60, 52);
+            pCtx.strokeStyle = '#10b981';
+            pCtx.lineWidth = 2;
+            pCtx.strokeRect(BOARD_RECT.x + 30, BOARD_RECT.y + BOARD_RECT.h - 68, BOARD_RECT.w - 60, 52);
+
+            pCtx.fillStyle = '#10b981';
+            pCtx.font = '700 16px Orbitron, sans-serif';
+            pCtx.textAlign = 'center';
+            pCtx.fillText(
+                `¡ARTEFACTO ENSAMBLADO! TIEMPO: ${timerDisplay.textContent}`,
+                BOARD_RECT.x + BOARD_RECT.w / 2,
+                BOARD_RECT.y + BOARD_RECT.h - 36
+            );
+            pCtx.restore();
+        }
+    }
+}
+
+function getPuzzlePointerPos(e) {
+    const rect = puzzleCanvas.getBoundingClientRect();
+    return {
+        x: (e.clientX - rect.left) * (puzzleCanvas.width / rect.width),
+        y: (e.clientY - rect.top) * (puzzleCanvas.height / rect.height)
+    };
+}
+
+function downloadArtifact() {
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = BOARD_RECT.w;
+    exportCanvas.height = BOARD_RECT.h;
+    const exportContext = exportCanvas.getContext('2d');
+
+    if (!exportContext) {
+        showToast('No se pudo preparar la descarga del artefacto');
+        return;
+    }
+
+    drawArtifactArtwork(exportContext, 0, 0, BOARD_RECT.w, BOARD_RECT.h);
+    exportCanvas.toBlob((blob) => {
+        if (!blob) {
+            showToast('No se pudo generar la imagen del artefacto');
+            return;
+        }
+
+        const downloadUrl = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = 'artefacto-marciano.png';
+        downloadLink.click();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    }, 'image/png');
+}
+
+puzzleCanvas.addEventListener('pointerdown', (e) => {
+    if (gamePhase !== 'PUZZLE') return;
+    const pos = getPuzzlePointerPos(e);
+
+    for (let i = puzzlePieces.length - 1; i >= 0; i--) {
+        const piece = puzzlePieces[i];
+        if (piece.snapped) continue;
+
+        drawPiecePath(pCtx, piece, piece.x, piece.y);
+        if (pCtx.isPointInPath(pos.x, pos.y)) {
+            draggingPiece = piece;
+            dragOffsetX = pos.x - piece.x;
+            dragOffsetY = pos.y - piece.y;
+            puzzlePieces.splice(i, 1);
+            puzzlePieces.push(piece);
+            renderPuzzle();
+            break;
+        }
+    }
+});
+
+puzzleCanvas.addEventListener('pointermove', (e) => {
+    if (!draggingPiece || gamePhase !== 'PUZZLE') return;
+    const pos = getPuzzlePointerPos(e);
+    draggingPiece.x = pos.x - dragOffsetX;
+    draggingPiece.y = pos.y - dragOffsetY;
+    renderPuzzle();
+});
+
+window.addEventListener('pointerup', () => {
+    if (!draggingPiece) return;
+
+    const dist = Math.hypot(draggingPiece.x - draggingPiece.targetX, draggingPiece.y - draggingPiece.targetY);
+    if (dist < 42) {
+        draggingPiece.x = draggingPiece.targetX;
+        draggingPiece.y = draggingPiece.targetY;
+        draggingPiece.snapped = true;
+        SoundEngine.playSnap();
+
+        const snappedTotal = puzzlePieces.filter((p) => p.snapped).length;
+        puzzleStatus.textContent = `Piezas acopladas: ${snappedTotal} / 5`;
+
+        if (snappedTotal === 5) {
+            gamePhase = 'VICTORY';
+            puzzleBadge.textContent = 'Misión Cumplida • Señal Transmitida';
+            puzzleStatus.textContent = '¡Sincronización al 100% completada!';
+            btnReplay.classList.remove('hidden');
+            btnDownload.classList.remove('hidden');
+            SoundEngine.playVictory();
+        }
+    }
+
+    draggingPiece = null;
+    renderPuzzle();
+});
+
+// ============================================================================
+// 8. CONTROLES DE TECLADO, CÁMARA Y JOYSTICK TÁCTIL
+// ============================================================================
+window.addEventListener('keydown', (e) => {
+    if (e.code in keys) {
+        keys[e.code] = true;
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+            e.preventDefault();
+        }
+    }
+    if (e.code === 'KeyC') {
+        cameraMode = (cameraMode + 1) % 2;
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.code in keys) keys[e.code] = false;
+});
+
+camBtn.addEventListener('click', () => {
+    cameraMode = (cameraMode + 1) % 2;
+});
+
+const joystickZone = document.getElementById('joystick-zone');
+const joystickKnob = document.getElementById('joystick-knob');
+const turboTouchBtn = document.getElementById('turbo-touch-btn');
+
+function updateJoystick(clientX, clientY) {
+    const rect = joystickZone.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const maxR = rect.width / 2 - 20;
+
+    let dx = clientX - centerX;
+    let dy = clientY - centerY;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist > maxR) {
+        dx = (dx / dist) * maxR;
+        dy = (dy / dist) * maxR;
+    }
+
+    joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    joystick.dx = dx / maxR;
+    joystick.dy = dy / maxR;
+}
+
+joystickZone.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    joystick.active = true;
+    joystickZone.setPointerCapture(e.pointerId);
+    updateJoystick(e.clientX, e.clientY);
+});
+
+joystickZone.addEventListener('pointermove', (e) => {
+    if (!joystick.active) return;
+    updateJoystick(e.clientX, e.clientY);
+});
+
+joystickZone.addEventListener('pointerup', () => {
+    joystick.active = false;
+    joystick.dx = 0;
+    joystick.dy = 0;
+    joystickKnob.style.transform = 'translate(-50%, -50%)';
+});
+
+turboTouchBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    keys.Space = true;
+    turboTouchBtn.classList.add('active');
+});
+
+turboTouchBtn.addEventListener('pointerup', () => {
+    keys.Space = false;
+    turboTouchBtn.classList.remove('active');
+});
+
+// ============================================================================
+// 9. BUCLE PRINCIPAL 3D
+// ============================================================================
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function mainLoop(timestamp) {
+    const dt = Math.min((timestamp - lastFrameTime) / 1000, 0.1);
+    lastFrameTime = timestamp;
+
+    if (gamePhase === 'EXPLORE') {
+        updateExplore3D(dt);
+        renderRadar();
+    } else if (gamePhase === 'MENU') {
+        // Órbita panorámica alrededor del Rover 3D en el menú de inicio
+        const orbitAngle = timestamp * 0.0004;
+        camera.position.set(Math.cos(orbitAngle) * 8.5, 4.2, Math.sin(orbitAngle) * 8.5);
+        camera.lookAt(0, 1.1, 0);
+        rover3D.dishGroup.rotation.y += dt * 1.5;
+    }
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(mainLoop);
+}
+
+function launchNewMission() {
+    SoundEngine.init();
+    initMarsWorld3D();
+    startModal.classList.add('hidden');
+    puzzleModal.classList.add('hidden');
+    gamePhase = 'EXPLORE';
+    showToast('🛰️ Sigue la flecha holográfica y el radar para hallar las 5 piezas');
+}
+
+btnStartMission.addEventListener('click', launchNewMission);
+btnReplay.addEventListener('click', launchNewMission);
+btnDownload.addEventListener('click', downloadArtifact);
+
+initMarsWorld3D();
+lastFrameTime = performance.now();
+requestAnimationFrame(mainLoop);
+</script>
+</body>
+</html>
